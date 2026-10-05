@@ -32,7 +32,7 @@ function LineCard({
       </div>
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-          <CartesianGrid vertical={false} stroke={c.grid} />
+          <CartesianGrid vertical={false} stroke={c.grid} strokeDasharray="3 5" />
           <XAxis dataKey="date" tickFormatter={dayLabel} minTickGap={32} {...axisProps(c)} />
           <YAxis domain={domain ?? ["auto", "auto"]} {...axisProps(c)} axisLine={false} width={48} />
           {refY != null && <ReferenceLine y={refY} stroke={c.axis} />}
@@ -44,7 +44,7 @@ function LineCard({
               })} />
             ) : null} />
           {series.map((s) => (
-            <Line key={s.key} dataKey={s.key} stroke={s.color} strokeWidth={s.width ?? 2} dot={false}
+            <Line key={s.key} type="monotone" dataKey={s.key} stroke={s.color} strokeWidth={s.width ?? 2} dot={false}
                   connectNulls strokeLinecap="round" strokeLinejoin="round"
                   activeDot={{ r: 4, stroke: c.surface, strokeWidth: 2 }} isAnimationActive={false} />
           ))}
@@ -118,7 +118,7 @@ export default function Trends({ c }: { c: Palette }) {
               </div>
               <ResponsiveContainer width="100%" height={220}>
                 <ComposedChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 0 }} barCategoryGap={range > 90 ? 0.5 : 2}>
-                  <CartesianGrid vertical={false} stroke={c.grid} />
+                  <CartesianGrid vertical={false} stroke={c.grid} strokeDasharray="3 5" />
                   <XAxis dataKey="date" tickFormatter={dayLabel} minTickGap={32} {...axisProps(c)} />
                   <YAxis domain={[0, 100]} ticks={[0, 33, 67, 100]} {...axisProps(c)} axisLine={false} width={48} />
                   <Tooltip cursor={{ fill: c.grid, opacity: 0.6 }} content={({ active, payload }) => {
@@ -131,10 +131,10 @@ export default function Trends({ c }: { c: Palette }) {
                       { name: "Теги", value: p.tags.length ? p.tags.map((t: string) => "#" + t).join(" ") : "—", color: "transparent" },
                     ]} />;
                   }} />
-                  <Bar dataKey="recovery" maxBarSize={24} radius={range > 90 ? [2, 2, 0, 0] : [4, 4, 0, 0]} isAnimationActive={false}>
+                  <Bar dataKey="recovery" maxBarSize={24} radius={range > 90 ? [3, 3, 3, 3] : [6, 6, 6, 6]} isAnimationActive={false}>
                     {data.map((d) => <Cell key={d.date} fill={recoveryStatus(d.recovery, c).color} />)}
                   </Bar>
-                  <Line dataKey="rec7" stroke={c.ink2} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+                  <Line type="monotone" dataKey="rec7" stroke={c.ink2} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -158,7 +158,7 @@ export default function Trends({ c }: { c: Palette }) {
               <div className="card-head"><h2>Strain</h2></div>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 0 }} barCategoryGap={range > 90 ? 0.5 : 2}>
-                  <CartesianGrid vertical={false} stroke={c.grid} />
+                  <CartesianGrid vertical={false} stroke={c.grid} strokeDasharray="3 5" />
                   <XAxis dataKey="date" tickFormatter={dayLabel} minTickGap={32} {...axisProps(c)} />
                   <YAxis domain={[0, 21]} ticks={[0, 7, 14, 21]} {...axisProps(c)} axisLine={false} width={48} />
                   <Tooltip cursor={{ fill: c.grid, opacity: 0.6 }} content={({ active, payload }) => {
@@ -169,7 +169,7 @@ export default function Trends({ c }: { c: Palette }) {
                       ...p.workouts.map((w) => ({ name: w.sport, value: fmt(w.strain, 1), color: "transparent" })),
                     ]} />;
                   }} />
-                  <Bar dataKey="strain" fill={c.strain} maxBarSize={24} radius={range > 90 ? [2, 2, 0, 0] : [4, 4, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="strain" fill={c.strain} maxBarSize={24} radius={range > 90 ? [3, 3, 3, 3] : [6, 6, 6, 6]} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

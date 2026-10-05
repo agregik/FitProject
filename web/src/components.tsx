@@ -13,7 +13,7 @@ export const dayLabelLong = (iso: string) => {
 };
 
 export function RecoveryRing({ value, color, size = 168 }: { value?: number | null; color: string; size?: number }) {
-  const stroke = 14;
+  const stroke = 12;
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   const pct = Math.max(0, Math.min(100, value ?? 0)) / 100;
@@ -23,10 +23,10 @@ export function RecoveryRing({ value, color, size = 168 }: { value?: number | nu
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--surface-2)" strokeWidth={stroke} />
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
               strokeLinecap="round" strokeDasharray={`${circ * pct} ${circ}`}
-              transform={`rotate(-90 ${size / 2} ${size / 2})`} style={{ transition: "stroke-dasharray .6s" }} />
+              transform={`rotate(-90 ${size / 2} ${size / 2})`} style={{ transition: "stroke-dasharray .9s cubic-bezier(.22,.61,.36,1), stroke .4s" }} />
       <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fill="var(--ink)"
-            fontSize={size * 0.3} fontWeight={700}>{value == null ? "—" : Math.round(value)}</text>
-      <text x="50%" y={size / 2 + size * 0.2} textAnchor="middle" fill="var(--ink-2)" fontSize={13}>recovery %</text>
+            fontSize={size * 0.3} fontWeight={700} letterSpacing="-0.03em">{value == null ? "—" : Math.round(value)}</text>
+      <text x="50%" y={size / 2 + size * 0.2} textAnchor="middle" fill="var(--muted)" fontSize={12} fontWeight={600}>recovery %</text>
     </svg>
   );
 }
@@ -92,5 +92,6 @@ export function Legend({ items }: { items: { label: string; color: string; kind?
 export const axisProps = (c: Palette) => ({
   stroke: c.axis,
   tick: { fill: c.muted, fontSize: 11 },
+  axisLine: false,
   tickLine: false,
 });

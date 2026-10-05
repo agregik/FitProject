@@ -38,7 +38,7 @@ export default function Today({ c }: { c: Palette }) {
           <RecoveryRing value={d.recovery} color={st.color} />
           <div className="stack">
             <span className="pill"><span className="pill-dot" style={{ background: st.color }} />{st.label}</span>
-            <div style={{ fontSize: 20, fontWeight: 600 }}>{tgt.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em" }}>{tgt.label}</div>
             {tgt.min != null && (
               <div>
                 <div className="sub" style={{ marginBottom: 8 }}>
@@ -55,7 +55,7 @@ export default function Today({ c }: { c: Palette }) {
             )}
             {t.bedtime && (
               <div className="sub">
-                🛏 Отбой около <b style={{ color: "var(--ink)" }}>{t.bedtime.bedtime}</b>, чтобы к {t.bedtime.wake_time} получить
+                Отбой около <b style={{ color: "var(--ink)" }}>{t.bedtime.bedtime}</b>, чтобы к {t.bedtime.wake_time} получить
                 {" "}{fmt(t.bedtime.need_hours, 1)} ч сна
               </div>
             )}
@@ -64,10 +64,10 @@ export default function Today({ c }: { c: Palette }) {
 
         <div className="card">
           <div className="card-head"><h2>Сигналы</h2></div>
-          {t.alerts.length === 0 && <div className="sub">Всё в пределах твоей нормы 👌</div>}
+          {t.alerts.length === 0 && <div className="sub">Всё в пределах твоей нормы</div>}
           {t.alerts.map((a, i) => (
             <div className="alert" key={i}>
-              <span>{a.level === "warn" ? "⚠️" : a.level === "good" ? "✅" : "💡"}</span>
+              <span className="alert-dot" style={{ background: a.level === "warn" ? c.warning : a.level === "good" ? c.good : c.hrv }} />
               <span>{a.text}</span>
             </div>
           ))}
@@ -79,7 +79,7 @@ export default function Today({ c }: { c: Palette }) {
               <BarChart data={t.last7} margin={{ top: 8, right: 0, left: -28, bottom: 0 }}>
                 <XAxis dataKey="date" tickFormatter={dayLabel} {...axisProps(c)} />
                 <YAxis domain={[0, 100]} ticks={[0, 50, 100]} {...axisProps(c)} axisLine={false} />
-                <Tooltip cursor={{ fill: c.grid, opacity: 0.5 }} content={({ active, payload }) => {
+                <Tooltip cursor={{ fill: c.grid, opacity: 0.6, radius: 8 } as object} content={({ active, payload }) => {
                   if (!active || !payload?.length) return null;
                   const p = payload[0].payload;
                   const s = recoveryStatus(p.recovery, c);
@@ -89,7 +89,7 @@ export default function Today({ c }: { c: Palette }) {
                     { name: "Сон", value: `${fmt(p.sleep_hours, 1)} ч`, color: c.sleep },
                   ]} />;
                 }} />
-                <Bar dataKey="recovery" maxBarSize={24} radius={[4, 4, 0, 0]}>
+                <Bar dataKey="recovery" maxBarSize={22} radius={[8, 8, 8, 8]}>
                   {t.last7.map((x) => <Cell key={x.date} fill={recoveryStatus(x.recovery, c).color} />)}
                 </Bar>
               </BarChart>

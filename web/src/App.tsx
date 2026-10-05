@@ -8,13 +8,27 @@ import Today from "./pages/Today";
 import Trends from "./pages/Trends";
 import { useTheme } from "./theme";
 
+const I = (d: string) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d={d} />
+  </svg>
+);
+const ICONS: Record<string, JSX.Element> = {
+  today: I("M12 3a9 9 0 1 0 9 9M12 7a5 5 0 1 0 5 5M12 11a1 1 0 1 0 1 1"),
+  trends: I("M3 17l5-5 4 4 8-9M15 7h5v5"),
+  journal: I("M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4zM9 9h6M9 13h4"),
+  insights: I("M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"),
+  coach: I("M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"),
+  settings: I("M4 7h10M18 7h2M4 17h4M12 17h8M16 5v4M10 15v4"),
+};
+
 const PAGES = [
-  { id: "today", label: "Сегодня", icon: "◉" },
-  { id: "trends", label: "Тренды", icon: "📈" },
-  { id: "journal", label: "Журнал", icon: "✎" },
-  { id: "insights", label: "Инсайты", icon: "💡" },
-  { id: "coach", label: "Коуч", icon: "💬" },
-  { id: "settings", label: "Настройки", icon: "⚙︎" },
+  { id: "today", label: "Сегодня" },
+  { id: "trends", label: "Тренды" },
+  { id: "journal", label: "Журнал" },
+  { id: "insights", label: "Инсайты" },
+  { id: "coach", label: "Коуч" },
+  { id: "settings", label: "Настройки" },
 ] as const;
 type PageId = (typeof PAGES)[number]["id"];
 
@@ -56,18 +70,18 @@ export default function App() {
         <div className="brand"><span className="brand-dot" />FitProject</div>
         {PAGES.map((p) => (
           <button key={p.id} className={`nav-btn ${page === p.id ? "active" : ""}`} onClick={() => go(p.id)}>
-            <span className="nav-ico">{p.icon}</span>{p.label}
+            <span className="nav-ico">{ICONS[p.id]}</span>{p.label}
           </button>
         ))}
         <div className="side-foot">
-          {me?.is_demo && <span>🧪 Демо-данные</span>}
+          {me?.is_demo && <span>Демо-данные</span>}
           {me && !me.is_demo && <span>{me.first_name} {me.last_name}</span>}
         </div>
       </nav>
-      <main>
+      <main key={page}>
         {me?.is_demo && page === "today" && (
           <div className="banner">
-            <span>🧪 Это демо на синтетических данных за 180 дней. Подключи свой WHOOP в настройках.</span>
+            <span>Это демо на синтетических данных за 180 дней. Подключи свой WHOOP в настройках.</span>
             <button className="btn" onClick={() => go("settings")}>Настройки</button>
           </div>
         )}

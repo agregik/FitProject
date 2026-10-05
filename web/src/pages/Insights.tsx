@@ -102,7 +102,7 @@ export default function Insights({ c }: { c: Palette }) {
         <div className="card-head"><h2>Recovery по дням недели</h2></div>
         <ResponsiveContainer width="100%" height={180}>
           <BarChart data={ins.weekday} margin={{ top: 16, right: 8, left: -20, bottom: 0 }}>
-            <CartesianGrid vertical={false} stroke={c.grid} />
+            <CartesianGrid vertical={false} stroke={c.grid} strokeDasharray="3 5" />
             <XAxis dataKey="weekday" {...axisProps(c)} />
             <YAxis domain={[0, 100]} ticks={[0, 50, 100]} {...axisProps(c)} axisLine={false} width={48} />
             <Tooltip cursor={{ fill: c.grid, opacity: 0.6 }} content={({ active, payload }) =>
@@ -112,7 +112,7 @@ export default function Insights({ c }: { c: Palette }) {
                   { name: "Дней", value: String(payload[0].payload.n), color: "transparent" },
                 ]} />
               ) : null} />
-            <Bar dataKey="recovery" fill={c.hrv} maxBarSize={24} radius={[4, 4, 0, 0]} isAnimationActive={false}>
+            <Bar dataKey="recovery" fill={c.hrv} maxBarSize={24} radius={[8, 8, 8, 8]} isAnimationActive={false}>
               <LabelList dataKey="recovery" position="top" fill={c.ink2} fontSize={11}
                          formatter={(v: number) => fmt(v)} />
             </Bar>
@@ -132,7 +132,7 @@ function DriverScatter({ d, c }: { d: Driver; c: Palette }) {
       </div>
       <ResponsiveContainer width="100%" height={280}>
         <ScatterChart margin={{ top: 8, right: 8, left: -20, bottom: 8 }}>
-          <CartesianGrid stroke={c.grid} />
+          <CartesianGrid stroke={c.grid} strokeDasharray="3 5" />
           <XAxis type="number" dataKey="x" name={xName} domain={["auto", "auto"]} {...axisProps(c)} />
           <YAxis type="number" dataKey="y" name="Recovery" domain={[0, 100]} {...axisProps(c)} width={48} />
           <Tooltip cursor={{ stroke: c.muted }} content={({ active, payload }) =>

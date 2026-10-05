@@ -3,18 +3,18 @@ import { useEffect, useState } from "react";
 // Chart colors are read in JS because SVG presentation attributes can't use CSS var().
 // Values follow the validated reference palette (categorical slots + fixed status colors).
 const LIGHT = {
-  surface: "#fcfcfb", ink: "#0b0b0b", ink2: "#52514e", muted: "#898781",
-  grid: "#e1e0d9", axis: "#c3c2b7",
-  hrv: "#2a78d6", strain: "#eb6834", sleep: "#4a3aa7", aqua: "#1baf7a", need: "#898781",
-  good: "#0ca30c", warning: "#fab219", critical: "#d03b3b",
-  pos: "#2a78d6", neg: "#e34948", neutral: "#f0efec",
+  surface: "#fffdf9", ink: "#2b2520", ink2: "#6e645a", muted: "#a59a8e",
+  grid: "#efe8dd", axis: "#ddd3c5",
+  hrv: "#6f93b8", strain: "#d9905f", sleep: "#9283bd", aqua: "#6fae95", need: "#c9bfb2",
+  good: "#86b27c", warning: "#e6b865", critical: "#d9806f",
+  pos: "#6f93b8", neg: "#d9806f", neutral: "#f2ece2",
 };
 const DARK: typeof LIGHT = {
-  surface: "#1a1a19", ink: "#ffffff", ink2: "#c3c2b7", muted: "#898781",
-  grid: "#2c2c2a", axis: "#383835",
-  hrv: "#3987e5", strain: "#d95926", sleep: "#9085e9", aqua: "#199e70", need: "#898781",
-  good: "#0ca30c", warning: "#fab219", critical: "#d03b3b",
-  pos: "#3987e5", neg: "#e66767", neutral: "#383835",
+  surface: "#25211d", ink: "#f4eee5", ink2: "#c7bcae", muted: "#8f857a",
+  grid: "#342f29", axis: "#4a4239",
+  hrv: "#8aabcf", strain: "#e3a075", sleep: "#a899d1", aqua: "#84c0a7", need: "#6d645a",
+  good: "#94c08a", warning: "#e9c27a", critical: "#e0907f",
+  pos: "#8aabcf", neg: "#e0907f", neutral: "#3a342d",
 };
 export type Palette = typeof LIGHT;
 
