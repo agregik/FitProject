@@ -16,7 +16,8 @@ export default function Insights({ c }: { c: Palette }) {
   useEffect(() => { api.insights(period).then(setIns); }, [period]);
   if (!ins) return <div className="muted">Считаю закономерности…</div>;
 
-  const maxAbs = Math.max(20, ...ins.tags.map((t) => Math.abs(t.recovery_diff)));
+  const maxAbs = Math.max(20, ...ins.tags.flatMap((t) => [Math.abs(t.ci_low), Math.abs(t.ci_high)]));
+  const pct = (v: number) => 50 + (v / maxAbs) * 50;
   const d = ins.drivers.find((x) => x.key === driver) ?? ins.drivers[0];
 
   return (
@@ -38,7 +39,9 @@ export default function Insights({ c }: { c: Palette }) {
           <div>
             <h2>Привычки → recovery на следующее утро</h2>
             <div className="sub" style={{ fontSize: 12 }}>
-              Разница среднего recovery после дней с тегом и без него. Уверенность считается перестановочным тестом.
+              Разница среднего recovery после дней с тегом и без него. Тонкая линия — 95% интервал: если он
+              пересекает ноль, эффект может быть случайным. Уверенность учитывает, что тегов много и какой-то
+              из них «выстрелит» по чистой случайности.
             </div>
           </div>
           <div className="legend">
@@ -47,7 +50,7 @@ export default function Insights({ c }: { c: Palette }) {
           </div>
         </div>
         {ins.tags.length === 0 && (
-          <div className="sub">Пока мало записей. Нужно хотя бы 4 дня с тегом, чтобы что-то сравнить: веди журнал пару недель.</div>
+          <div className="sub">Пока мало записей. Нужно хотя бы 7 дней с тегом, чтобы что-то сравнить: веди журнал пару недель.</div>
         )}
         {ins.tags.map((t) => {
           const w = (Math.abs(t.recovery_diff) / maxAbs) * 50;
@@ -55,7 +58,8 @@ export default function Insights({ c }: { c: Palette }) {
           const dim = t.confidence === "низкая" ? 0.4 : 1;
           return (
             <div className="effect-row" key={t.tag}
-                 title={`После #${t.tag}: ${t.recovery_with}% · без: ${t.recovery_without}% · p=${t.p_value}`}>
+                 title={`После #${t.tag}: ${t.recovery_with}% (${t.n} дн.) · без: ${t.recovery_without}% (${t.n_without} дн.)\n`
+                   + `95% интервал: ${fmt(t.ci_low, 1)}…${fmt(t.ci_high, 1)} п. · p=${t.p_value} · с поправкой q=${t.q_value}`}>
               <div><span className="tag">#{t.tag}</span> <span className="muted" style={{ fontSize: 12 }}>×{t.n}</span></div>
               <div className="effect-bar-wrap">
                 <div className="effect-mid" />
@@ -63,15 +67,27 @@ export default function Insights({ c }: { c: Palette }) {
                   left: pos ? "50%" : `${50 - w}%`, width: `${w}%`, background: pos ? c.pos : c.neg, opacity: dim,
                   borderRadius: pos ? "0 4px 4px 0" : "4px 0 0 4px",
                 }} />
+                <div className="effect-ci" style={{ left: `${pct(t.ci_low)}%`, width: `${pct(t.ci_high) - pct(t.ci_low)}%` }} />
               </div>
               <div className="effect-meta">
                 <b style={{ color: "var(--ink)" }}>{pos ? "+" : "−"}{fmt(Math.abs(t.recovery_diff))} п.</b>
                 {t.hrv_diff_pct != null && <> · HRV {t.hrv_diff_pct > 0 ? "+" : ""}{fmt(t.hrv_diff_pct)}%</>}
-                <br /><span title="уверенность">{CONF_ICON[t.confidence]} {t.confidence}</span>
+                <br /><span className="muted">{fmt(t.ci_low)}…{fmt(t.ci_high)}</span>
+                {" · "}<span title="уверенность">{CONF_ICON[t.confidence]} {t.confidence}</span>
               </div>
             </div>
           );
         })}
+        {ins.pending_tags.length > 0 && (
+          <div className="pending-tags">
+            <span className="sub" style={{ fontSize: 12 }}>Собираем данные:</span>
+            {ins.pending_tags.map((p) => (
+              <span key={p.tag} className="pending-tag" title={`Нужно ещё ${p.need - p.n} дн. с этим тегом`}>
+                #{p.tag} <span className="muted">{p.n}/{p.need}</span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid g2">
@@ -89,7 +105,7 @@ export default function Insights({ c }: { c: Palette }) {
                   <span className="sub">{x.explain}: {x.slope > 0 ? "+" : ""}{fmt(x.slope, 1)} п. recovery</span>
                 </span>
                 <span className="sub" style={{ whiteSpace: "nowrap", fontSize: 12 }}>
-                  r = {fmt(x.r, 2)}<br />{CONF_ICON[x.confidence]}
+                  r = {fmt(x.r, 2)} · n = {x.n}<br />{CONF_ICON[x.confidence]}
                 </span>
               </button>
             ))}
@@ -128,7 +144,9 @@ function DriverScatter({ d, c }: { d: Driver; c: Palette }) {
   return (
     <div className="card">
       <div className="card-head">
-        <div><h2>{d.label}</h2><div className="sub" style={{ fontSize: 12 }}>Каждая точка — один день, n = {d.n}</div></div>
+        <div><h2>{d.label}</h2><div className="sub" style={{ fontSize: 12 }}>
+          Каждая точка — один день, n = {d.n} · r = {fmt(d.r, 2)} (95%: {fmt(d.r_low, 2)}…{fmt(d.r_high, 2)})
+        </div></div>
       </div>
       <ResponsiveContainer width="100%" height={280}>
         <ScatterChart margin={{ top: 8, right: 8, left: -20, bottom: 8 }}>

@@ -11,9 +11,9 @@ from pathlib import Path
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from . import calendar_ics, coach, config, db, demo, insights, telegram, whoop
+from . import calendar_ics, coach, config, db, demo, insights, telegram, training, whoop
 from .days import build_days, today_for, today_summary
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -214,6 +214,77 @@ def tags(user=Depends(current_user)):
     quick = [t for t in telegram.QUICK_TAGS if t not in counts]
     return [{"tag": t, "count": n} for t, n in sorted(counts.items(), key=lambda x: -x[1])] + \
            [{"tag": t, "count": 0} for t in quick]
+
+
+# ---------- strength training ----------
+
+class SetIn(BaseModel):
+    weight_kg: float | None = Field(None, ge=0, le=1000)
+    reps: int = Field(..., ge=1, le=200)
+    rir: int | None = Field(None, ge=0, le=10)
+
+
+class LiftItemIn(BaseModel):
+    exercise: str = Field(..., min_length=1, max_length=80)
+    muscle_group: str | None = None
+    sets: list[SetIn] = Field(..., min_length=1, max_length=30)
+
+
+class LiftSessionIn(BaseModel):
+    day: str | None = None
+    title: str | None = Field(None, max_length=80)
+    notes: str | None = Field(None, max_length=1000)
+    items: list[LiftItemIn] = Field(..., min_length=1, max_length=30)
+
+
+def _save_lift(body: LiftSessionIn, user: dict, session_id: int | None = None) -> dict:
+    day = body.day or today_for(user)
+    try:
+        date.fromisoformat(day)
+    except ValueError:
+        raise HTTPException(400, "Неверная дата")
+    try:
+        sid = training.save_session(user["id"], day, body.title, body.notes,
+                                    [i.model_dump() for i in body.items], session_id)
+    except KeyError:
+        raise HTTPException(404, "Тренировка не найдена")
+    return {"id": sid}
+
+
+@app.get("/api/training/exercises")
+def lift_exercises(user=Depends(current_user)):
+    return {"exercises": training.exercises(user["id"]), "groups": training.MUSCLE_GROUPS}
+
+
+@app.get("/api/training/sessions")
+def lift_sessions(start: str | None = None, end: str | None = None, user=Depends(current_user)):
+    end = end or today_for(user)
+    start = start or (date.fromisoformat(end) - timedelta(days=90)).isoformat()
+    return training.sessions(user["id"], start, end)
+
+
+@app.post("/api/training/sessions")
+def lift_create(body: LiftSessionIn, user=Depends(current_user)):
+    return _save_lift(body, user)
+
+
+@app.put("/api/training/sessions/{session_id}")
+def lift_update(session_id: int, body: LiftSessionIn, user=Depends(current_user)):
+    return _save_lift(body, user, session_id)
+
+
+@app.delete("/api/training/sessions/{session_id}")
+def lift_delete(session_id: int, user=Depends(current_user)):
+    training.delete_session(user["id"], session_id)
+    return {"ok": True}
+
+
+@app.get("/api/training/progress/{exercise_id}")
+def lift_progress(exercise_id: int, user=Depends(current_user)):
+    try:
+        return training.progress(user["id"], exercise_id)
+    except KeyError:
+        raise HTTPException(404, "Упражнение не найдено")
 
 
 # ---------- coach ----------

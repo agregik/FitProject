@@ -67,6 +67,10 @@ def build_days(user_id: int, start: str | None = None, end: str | None = None) -
         d["notes"].append({"id": r["id"], "text": r["text"], "tags": tags, "source": r["source"]})
         d["tags"] = sorted(set(d["tags"]) | set(tags))
 
+    from .training import daily_load
+    for day, load in daily_load(user_id, start, end).items():
+        days[day].update(load)
+
     ev_by_day = defaultdict(list)
     for r in db.rows("SELECT * FROM events WHERE user_id=? AND day BETWEEN ? AND ?", p):
         ev_by_day[r["day"]].append(r)

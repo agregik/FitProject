@@ -23,16 +23,34 @@ export type Today = {
   last7: { date: string; recovery?: number; hrv?: number; sleep_hours?: number; strain?: number }[];
 };
 export type TagEffect = {
-  tag: string; n: number; recovery_with: number; recovery_without: number; recovery_diff: number;
-  hrv_diff_pct: number | null; p_value: number; confidence: "высокая" | "средняя" | "низкая";
+  tag: string; n: number; n_without: number; recovery_with: number; recovery_without: number; recovery_diff: number;
+  ci_low: number; ci_high: number; hrv_diff_pct: number | null; p_value: number; q_value: number;
+  confidence: "высокая" | "средняя" | "низкая";
 };
 export type Driver = {
-  key: string; label: string; r: number; n: number; slope: number; unit: string; explain: string;
+  key: string; label: string; r: number; r_low: number; r_high: number; p_value: number;
+  n: number; slope: number; unit: string; explain: string;
   confidence: string; points: { x: number; y: number }[];
 };
 export type Insights = {
   period_days: number; days_with_data: number; tags: TagEffect[]; drivers: Driver[];
+  pending_tags: { tag: string; n: number; need: number }[];
   weekday: { weekday: string; recovery: number | null; n: number }[];
+};
+export type LiftSet = { weight_kg: number | null; reps: number; rir: number | null };
+export type LiftItem = { exercise_id: number; exercise: string; muscle_group: string; sets: LiftSet[]; best_e1rm: number | null };
+export type LiftSession = {
+  id: number; day: string; title: string | null; notes: string | null; items: LiftItem[];
+  volume_kg: number; sets: number; groups: string[];
+};
+export type Exercise = { id: number; name: string; muscle_group: string; sessions: number; last_day: string | null };
+export type LiftProgress = {
+  id: number; name: string; muscle_group: string; best_e1rm: number | null;
+  points: { day: string; e1rm: number | null; top_kg: number | null; volume_kg: number; sets: number }[];
+};
+export type LiftSessionIn = {
+  day: string; title?: string | null; notes?: string | null;
+  items: { exercise: string; muscle_group?: string | null; sets: { weight_kg: number | null; reps: number; rir?: number | null }[] }[];
 };
 export type Me = {
   id: number; first_name: string | null; last_name: string | null; email: string | null; is_demo: boolean;
@@ -67,6 +85,13 @@ export const api = {
     req<{ id: number }>("/api/notes", { method: "POST", body: JSON.stringify({ text, day }) }),
   delNote: (id: number) => req(`/api/notes/${id}`, { method: "DELETE" }),
   tags: () => req<{ tag: string; count: number }[]>("/api/tags"),
+  exercises: () => req<{ exercises: Exercise[]; groups: string[] }>("/api/training/exercises"),
+  liftSessions: (start?: string) => req<LiftSession[]>(`/api/training/sessions${start ? `?start=${start}` : ""}`),
+  saveLift: (body: LiftSessionIn, id?: number) =>
+    req<{ id: number }>(`/api/training/sessions${id ? `/${id}` : ""}`,
+      { method: id ? "PUT" : "POST", body: JSON.stringify(body) }),
+  delLift: (id: number) => req(`/api/training/sessions/${id}`, { method: "DELETE" }),
+  liftProgress: (exerciseId: number) => req<LiftProgress>(`/api/training/progress/${exerciseId}`),
   coachHistory: () => req<{ role: "user" | "assistant"; content: string }[]>("/api/coach/history"),
   ask: (question: string) =>
     req<{ answer: string; ai: boolean }>("/api/coach", { method: "POST", body: JSON.stringify({ question }) }),

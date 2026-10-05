@@ -136,6 +136,36 @@ CREATE TABLE IF NOT EXISTS coach_messages (
     created_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS exercises (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL,
+    name         TEXT NOT NULL,
+    muscle_group TEXT NOT NULL DEFAULT 'другое',
+    UNIQUE (user_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS lift_sessions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    day        TEXT NOT NULL,
+    title      TEXT,
+    notes      TEXT,
+    created_at TEXT
+);
+CREATE INDEX IF NOT EXISTS lift_sessions_day ON lift_sessions(user_id, day);
+
+CREATE TABLE IF NOT EXISTS lift_sets (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id  INTEGER NOT NULL REFERENCES lift_sessions(id) ON DELETE CASCADE,
+    exercise_id INTEGER NOT NULL REFERENCES exercises(id),
+    ord         INTEGER NOT NULL,
+    weight_kg   REAL,
+    reps        INTEGER NOT NULL,
+    rir         INTEGER
+);
+CREATE INDEX IF NOT EXISTS lift_sets_session ON lift_sets(session_id);
+CREATE INDEX IF NOT EXISTS lift_sets_exercise ON lift_sets(exercise_id);
+
 CREATE TABLE IF NOT EXISTS notified (
     user_id INTEGER NOT NULL,
     kind    TEXT NOT NULL,

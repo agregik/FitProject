@@ -6,6 +6,7 @@ Hidden truths the insights engine should find:
   #сауна         → HRV +5%
   late meetings  → later bedtime, less sleep
   high strain    → lower next-day recovery
+  leg day        → next-day HRV −12% (strength log, progressive overload over 180 days)
 Plus a short illness episode (skin temp and respiratory rate up).
 """
 import json
@@ -16,6 +17,13 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 
 from . import db
+from .training import DEFAULT_EXERCISES
+
+# Strength program for the demo: (exercise, start kg, sets, reps). Bodyweight = None.
+LEGS = [("Приседания со штангой", 80, 4, 6), ("Румынская тяга", 70, 3, 8), ("Выпады", 20, 3, 10),
+        ("Подъёмы на носки", 60, 3, 12)]
+UPPER = [("Жим лёжа", 65, 4, 6), ("Тяга штанги в наклоне", 55, 4, 8), ("Жим стоя", 37.5, 3, 8),
+         ("Подтягивания", None, 3, 8), ("Подъём штанги на бицепс", 25, 3, 10)]
 
 TZ = "+03:00"
 OFF = timedelta(hours=3)
@@ -42,7 +50,8 @@ def seed(days: int = 180, rnd_seed: int = 42) -> int:
     if existing:
         uid = existing["id"]
         with db.conn() as c:
-            for t in ("cycles", "recovery", "sleeps", "workouts", "notes", "events", "coach_messages", "notified"):
+            for t in ("cycles", "recovery", "sleeps", "workouts", "notes", "events", "coach_messages", "notified",
+                      "lift_sessions", "exercises"):
                 c.execute(f"DELETE FROM {t} WHERE user_id=?", (uid,))
     else:
         uid = db.execute(
@@ -58,8 +67,12 @@ def seed(days: int = 180, rnd_seed: int = 42) -> int:
     prev_strain = 10.0
     cycle_id = 900000
     sleep_debt = 0.0
+    prev_legs = False
 
     with db.conn() as c:
+        c.executemany("INSERT OR IGNORE INTO exercises (user_id, name, muscle_group) VALUES (?,?,?)",
+                      [(uid, n, g) for n, g in DEFAULT_EXERCISES.items()])
+        ex_id = {r["name"]: r["id"] for r in c.execute("SELECT id, name FROM exercises WHERE user_id=?", (uid,))}
         for i in range(days):
             day = start + timedelta(days=i)
             prev = day - timedelta(days=1)
@@ -103,7 +116,7 @@ def seed(days: int = 180, rnd_seed: int = 42) -> int:
             if sick_start - timedelta(days=1) <= prev < sick_start + timedelta(days=3):
                 tags.add("болею")
             if i > 0:  # don't log for the day before the dataset starts
-                for t in tags:
+                for t in sorted(tags):  # sets iterate in random order per process
                     c.execute("INSERT INTO notes (user_id, day, text, tags, source, created_at) VALUES (?,?,?,?,?,?)",
                               (uid, prev.isoformat(), rnd.choice(NOTE_TEXT[t]), json.dumps([t], ensure_ascii=False),
                                rnd.choice(["web", "telegram"]), db.now_iso()))
@@ -133,6 +146,7 @@ def seed(days: int = 180, rnd_seed: int = 42) -> int:
             mult *= 1.05 if "сауна" in tags else 1
             mult *= 1.03 if "медитация" in tags else 1
             mult *= 0.92 if prev_strain > 15 else 1
+            mult *= 0.88 if prev_legs else 1
             mult *= 1 - max(0, need - asleep) * 0.04
             mult *= 0.7 if sick else 1
             hrv = max(20, (hrv_base + trend) * mult + rnd.gauss(0, 4.5))
@@ -199,6 +213,20 @@ def seed(days: int = 180, rnd_seed: int = 42) -> int:
                      round(strain, 1), round(120 + strain * 3), round(160 + strain * 1.5), round(strain * 180), dist, json.dumps(zones)),
                 )
             prev_strain = day_strain
+            prev_legs = False
+            if any(w[0] == "Weightlifting" for w in workouts):
+                legs = wd == 1
+                sid = c.execute("INSERT INTO lift_sessions (user_id, day, title, created_at) VALUES (?,?,?,?)",
+                                (uid, day.isoformat(), "Ноги" if legs else "Верх", db.now_iso())).lastrowid
+                ord_ = 0
+                for name, kg, n_sets, reps in (LEGS if legs else UPPER):
+                    w = None if kg is None else round(kg * (1 + 0.0018 * i) * rnd.uniform(0.97, 1.02) / 2.5) * 2.5
+                    for k in range(n_sets):
+                        ord_ += 1
+                        r = max(3, reps - (k == n_sets - 1 and rnd.random() < 0.4))
+                        c.execute("INSERT INTO lift_sets (session_id, exercise_id, ord, weight_kg, reps, rir) "
+                                  "VALUES (?,?,?,?,?,?)", (sid, ex_id[name], ord_, w, r, rnd.choice([1, 2, 2, 3])))
+                prev_legs = legs
 
         c.execute("UPDATE users SET last_sync_at=? WHERE id=?", (db.now_iso(), uid))
     return uid

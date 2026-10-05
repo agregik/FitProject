@@ -6,7 +6,9 @@ from datetime import date, timedelta
 
 from .days import build_days
 
-MIN_N = 4
+MIN_N = 7          # days with a tag before we compare anything at all
+MIN_N_HIGH = 10    # and before we're allowed to call an effect "high confidence"
+FDR_Q = 0.1        # Benjamini–Hochberg false-discovery rate across all tags
 WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
 
 
@@ -39,19 +41,50 @@ def _pearson(xs: list[float], ys: list[float]) -> float | None:
     return sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / (sx * sy)
 
 
-def _confidence(p: float, n: int) -> str:
-    if p < 0.05 and n >= 8:
+def _confidence(p: float, n: int, q: float | None = None) -> str:
+    # q is the FDR-adjusted p: with 15 tags, one will look "significant" by pure chance.
+    if p < 0.05 and n >= MIN_N_HIGH and (q is None or q < FDR_Q):
         return "высокая"
-    if p < 0.2:
+    if p < 0.2 and n >= MIN_N:
         return "средняя"
     return "низкая"
 
 
-def _corr_confidence(r: float, n: int) -> str:
+def _bh_adjust(ps: list[float]) -> list[float]:
+    """Benjamini–Hochberg adjusted p-values (q-values), same order as input."""
+    m = len(ps)
+    order = sorted(range(m), key=lambda i: ps[i])
+    q = [1.0] * m
+    prev = 1.0
+    for rank in range(m, 0, -1):
+        i = order[rank - 1]
+        prev = min(prev, ps[i] * m / rank)
+        q[i] = prev
+    return q
+
+
+def _diff_ci(a: list[float], b: list[float]) -> tuple[float, float]:
+    """95% CI for mean(a) - mean(b), Welch standard error."""
+    se = math.sqrt(statistics.variance(a) / len(a) + statistics.variance(b) / len(b))
+    d = statistics.fmean(a) - statistics.fmean(b)
+    return d - 1.96 * se, d + 1.96 * se
+
+
+def _corr_p(r: float, n: int) -> float:
     # Approximate p from t-statistic, normal approximation.
     t = abs(r) * math.sqrt((n - 2) / max(1e-9, 1 - r * r))
-    p = math.erfc(t / math.sqrt(2))
-    return _confidence(p, n)
+    return math.erfc(t / math.sqrt(2))
+
+
+def _corr_ci(r: float, n: int) -> tuple[float, float]:
+    """95% CI for Pearson r via Fisher z-transform."""
+    z = math.atanh(max(-0.999999, min(0.999999, r)))
+    se = 1 / math.sqrt(n - 3)
+    return math.tanh(z - 1.96 * se), math.tanh(z + 1.96 * se)
+
+
+def _corr_confidence(r: float, n: int) -> str:
+    return _confidence(_corr_p(r, n), n)
 
 
 def compute(user_id: int, days_back: int = 180) -> dict:
@@ -59,6 +92,19 @@ def compute(user_id: int, days_back: int = 180) -> dict:
     start = end - timedelta(days=days_back + 1)
     days = build_days(user_id, start.isoformat(), end.isoformat())
     by_date = {d["date"]: d for d in days}
+    # Logged strength sessions act like automatic tags: "силовая_ноги" etc. Groups that are always
+    # trained together (a typical upper-body day) collapse into one tag instead of four identical rows.
+    group_days: dict[str, set] = {}
+    for d in days:
+        for g in d.get("lift_groups", []):
+            group_days.setdefault(g, set()).add(d["date"])
+    by_dayset: dict[frozenset, list[str]] = {}
+    for g, ds in group_days.items():
+        by_dayset.setdefault(frozenset(ds), []).append(g)
+    for ds, groups in by_dayset.items():
+        tag = "силовая_" + "+".join(sorted(groups))
+        for day in ds:
+            by_date[day]["tags"] = sorted(set(by_date[day]["tags"]) | {tag})
 
     # Pair each day with the next day's recovery / HRV (evening behaviour → morning outcome).
     pairs = []
@@ -67,13 +113,14 @@ def compute(user_id: int, days_back: int = 180) -> dict:
         if nxt and nxt.get("recovery") is not None:
             pairs.append((d, nxt))
 
-    has_notes = {d["date"] for d in days if d.get("notes")}
+    has_notes = {d["date"] for d in days if d.get("notes") or d.get("lift_groups")}
     tag_counts: dict[str, int] = {}
     for d in days:
         for t in d.get("tags", []):
             tag_counts[t] = tag_counts.get(t, 0) + 1
 
     tag_effects = []
+    pending = []  # tags we've seen but can't judge yet — shown as "собираем данные"
     for tag, cnt in tag_counts.items():
         with_r = [n["recovery"] for d, n in pairs if tag in d["tags"]]
         # Compare against days where you logged something, but not this tag,
@@ -83,10 +130,12 @@ def compute(user_id: int, days_back: int = 180) -> dict:
             without = [(d, n) for d, n in pairs if tag not in d["tags"]]
         without_r = [n["recovery"] for _, n in without]
         if len(with_r) < MIN_N or len(without_r) < MIN_N:
+            pending.append({"tag": tag, "n": len(with_r), "need": MIN_N})
             continue
         with_h = [n["hrv"] for d, n in pairs if tag in d["tags"] and n.get("hrv")]
         without_h = [n["hrv"] for _, n in without if n.get("hrv")]
         diff = statistics.fmean(with_r) - statistics.fmean(without_r)
+        lo, hi = _diff_ci(with_r, without_r)
         p = _perm_p(with_r, without_r)
         hrv_diff_pct = None
         if with_h and without_h:
@@ -94,14 +143,21 @@ def compute(user_id: int, days_back: int = 180) -> dict:
         tag_effects.append({
             "tag": tag,
             "n": len(with_r),
+            "n_without": len(without_r),
             "recovery_with": round(statistics.fmean(with_r), 1),
             "recovery_without": round(statistics.fmean(without_r), 1),
             "recovery_diff": round(diff, 1),
+            "ci_low": round(lo, 1),
+            "ci_high": round(hi, 1),
             "hrv_diff_pct": round(hrv_diff_pct, 1) if hrv_diff_pct is not None else None,
             "p_value": round(p, 3),
-            "confidence": _confidence(p, len(with_r)),
         })
-    tag_effects.sort(key=lambda x: (x["confidence"] != "высокая", -abs(x["recovery_diff"])))
+    for t, q in zip(tag_effects, _bh_adjust([t["p_value"] for t in tag_effects])):
+        t["q_value"] = round(q, 3)
+        t["confidence"] = _confidence(t["p_value"], t["n"], q)
+    rank = {"высокая": 0, "средняя": 1, "низкая": 2}
+    tag_effects.sort(key=lambda x: (rank[x["confidence"]], -abs(x["recovery_diff"])))
+    pending.sort(key=lambda x: -x["n"])
 
     # Continuous drivers.
     drivers = []
@@ -116,8 +172,10 @@ def compute(user_id: int, days_back: int = 180) -> dict:
         mx, my = statistics.fmean(xs), statistics.fmean(ys)
         vx = sum((x - mx) ** 2 for x in xs)
         slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / vx if vx else 0
+        lo, hi = _corr_ci(r, len(xs))
         drivers.append({
             "key": key, "label": label, "r": round(r, 2), "n": len(xs),
+            "r_low": round(lo, 2), "r_high": round(hi, 2), "p_value": round(_corr_p(r, len(xs)), 3),
             "slope": round(slope, 2), "unit": unit, "explain": explain,
             "confidence": _corr_confidence(r, len(xs)),
             "points": [{"x": round(x, 2), "y": round(y, 1)} for x, y in pairs_xy],
@@ -129,6 +187,10 @@ def compute(user_id: int, days_back: int = 180) -> dict:
     add_driver("strain_prev", "Strain вчера → recovery сегодня",
                [(d["strain"], n["recovery"]) for d, n in pairs if d.get("strain") is not None],
                "ед. strain", "Каждая единица вчерашнего strain")
+    if any(d.get("lift_volume_kg") for d in days):  # only once the user actually logs lifts
+        add_driver("lift_volume", "Объём силовой вчера → recovery сегодня",
+                   [(d.get("lift_volume_kg", 0) / 1000, n["recovery"]) for d, n in pairs],
+                   "тонна", "Каждая тонна поднятого веса")
     add_driver("meetings", "Встречи вчера → recovery сегодня",
                [(d.get("meetings", 0), n["recovery"]) for d, n in pairs if "meetings" in d],
                "встреча", "Каждая встреча в календаре")
@@ -162,6 +224,7 @@ def compute(user_id: int, days_back: int = 180) -> dict:
         "period_days": days_back,
         "days_with_data": sum(1 for d in days if d.get("recovery") is not None),
         "tags": tag_effects,
+        "pending_tags": pending,
         "drivers": drivers,
         "weekday": weekday,
         "all_tags": sorted(tag_counts.items(), key=lambda x: -x[1]),
@@ -176,7 +239,8 @@ def headline(ins: dict, limit: int = 3) -> list[str]:
             continue
         sign = "снижает" if t["recovery_diff"] < 0 else "повышает"
         out.append(f"#{t['tag']} {sign} recovery следующего дня в среднем на {abs(t['recovery_diff']):.0f} п. "
-                   f"({t['recovery_with']:.0f}% против {t['recovery_without']:.0f}%, n={t['n']}, "
+                   f"({t['recovery_with']:.0f}% против {t['recovery_without']:.0f}%, "
+                   f"95% ДИ {t['ci_low']:+.0f}…{t['ci_high']:+.0f}, n={t['n']}, "
                    f"уверенность {t['confidence']})")
         if len(out) >= limit:
             break
