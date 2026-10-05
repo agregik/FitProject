@@ -88,9 +88,9 @@ b, strong { font-weight: 700; }
 }
 .brand { font-weight: 800; font-size: 18px; letter-spacing: -0.02em; margin: 0 12px 28px; display: flex; align-items: center; gap: 10px; }
 .brand-dot {
-  width: 22px; height: 22px; border-radius: 50%;
-  background: conic-gradient(from 200deg, var(--good), var(--warning), var(--critical), var(--good));
-  -webkit-mask: radial-gradient(circle, transparent 5px, #000 5.5px); mask: radial-gradient(circle, transparent 5px, #000 5.5px);
+  width: 26px; height: 26px; flex-shrink: 0; background: var(--ink);
+  /* Line-art PNG used as a mask, so it takes the theme's ink colour in light and dark mode. */
+  -webkit-mask: url("/logo.png") center / contain no-repeat; mask: url("/logo.png") center / contain no-repeat;
 }
 .nav-btn {
   display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px;
@@ -280,7 +280,7 @@ code { font-family: ui-monospace, Menlo, monospace; font-size: .9em; background:
     background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     box-shadow: 0 10px 30px -10px rgba(60, 40, 20, .25);
   }
-  .brand, .side-foot { display: none; }
+  .side .brand, .side-foot { display: none; }
   .nav-btn { flex: 1 1 0; min-width: 0; flex-direction: column; gap: 3px; font-size: 10px; padding: 7px 2px; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 14px; }
   .nav-btn.active { box-shadow: none; background: var(--surface-2); }
   main { padding: 22px 16px 110px; }
