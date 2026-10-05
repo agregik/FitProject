@@ -145,7 +145,10 @@ function PhoneCard({ me }: { me: Me }) {
       setLink({ url: r.url, qr, until: Date.now() + r.expires_in * 1000 });
       setLeft(r.expires_in);
     } catch (e) {
-      setErr((e as Error).message);
+      setErr((e as Error & { status?: number }).status === 409
+        ? "Телефон пока не видит этот компьютер: запусти в терминале ./tunnel.sh и дождись строки «✅ Телефон: …», "
+          + "потом нажми кнопку ещё раз. Если туннель не подключается — выключи VPN (V2Box)."
+        : (e as Error).message);
     }
   };
 
@@ -165,12 +168,7 @@ function PhoneCard({ me }: { me: Me }) {
   return (
     <div className="card stack">
       <h2>Подключить телефон</h2>
-      {!me.public_url ? (
-        <div className="sub">
-          Телефон не видит <code>localhost</code>. Запусти в отдельном терминале <code>./tunnel.sh</code>: он
-          откроет сервер по HTTPS-адресу. Потом обнови эту страницу.
-        </div>
-      ) : link ? (
+      {link ? (
         <>
           <img src={link.qr} alt="QR-код для входа с телефона" className="qr" />
           <div className="sub">
@@ -182,8 +180,8 @@ function PhoneCard({ me }: { me: Me }) {
       ) : (
         <>
           <div className="sub">
-            Покажет QR-код: наведёшь камеру айфона, и ты уже вошёл, без логина WHOOP. Адрес туннеля:{" "}
-            <span className="muted">{me.public_url.replace("https://", "")}</span>
+            Покажет QR-код: наведёшь камеру айфона, и ты уже вошёл, без логина WHOOP.
+            {me.public_url && <> Адрес: <span className="muted">{me.public_url.replace("https://", "")}</span></>}
           </div>
           <button className="btn primary" onClick={make}>Показать QR-код</button>
         </>
