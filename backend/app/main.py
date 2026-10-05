@@ -7,6 +7,7 @@ import secrets
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
@@ -86,8 +87,10 @@ def login():
 async def callback(request: Request, bg: BackgroundTasks, code: str | None = None, state: str | None = None,
                    error: str | None = None):
     if error:
-        return RedirectResponse(f"{config.WEB_URL}/?error={error}")
-    if not code or state != request.cookies.get("oauth_state"):
+        return RedirectResponse(f"{config.WEB_URL}/?error={quote(error)}")
+    expected = request.cookies.get("oauth_state")
+    # Both must be present: a missing state + missing cookie must not count as a match (login CSRF).
+    if not code or not state or not expected or not secrets.compare_digest(state, expected):
         raise HTTPException(400, "Неверный state OAuth, попробуй войти ещё раз")
     uid = await whoop.login_with_code(code)
     u = db.get_user(uid)
@@ -137,7 +140,10 @@ async def sync(user=Depends(current_user)):
     if user["is_demo"]:
         return {"demo": True}
     counts = await whoop.sync_user(user["id"])
-    counts["events"] = await calendar_ics.sync_calendar(user["id"])
+    try:
+        counts["events"] = await calendar_ics.sync_calendar(user["id"])
+    except calendar_ics.CalendarFetchError as e:
+        counts["calendar_error"] = str(e)  # WHOOP data still synced; old events kept
     await telegram.push_scheduled(user["id"])
     return counts
 
@@ -320,7 +326,13 @@ class CalendarIn(BaseModel):
 async def set_calendar(body: CalendarIn, user=Depends(current_user)):
     urls = [u.strip() for u in body.urls if u.strip()]
     db.execute("UPDATE users SET ics_urls=? WHERE id=?", (json.dumps(urls), user["id"]))
-    n = await calendar_ics.sync_calendar(user["id"]) if urls else 0
+    if not urls:
+        db.execute("DELETE FROM events WHERE user_id=?", (user["id"],))
+        return {"events": 0}
+    try:
+        n = await calendar_ics.sync_calendar(user["id"])
+    except calendar_ics.CalendarFetchError as e:
+        raise HTTPException(502, str(e))
     return {"events": n}
 
 

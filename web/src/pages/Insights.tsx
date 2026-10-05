@@ -50,7 +50,8 @@ export default function Insights({ c }: { c: Palette }) {
           </div>
         </div>
         {ins.tags.length === 0 && (
-          <div className="sub">Пока мало записей. Нужно хотя бы 7 дней с тегом, чтобы что-то сравнить: веди журнал пару недель.</div>
+          <div className="sub">Пока мало записей. Нужно хотя бы 7 дней с тегом и 7 дней с записями без него: веди журнал
+            каждый вечер, даже если писать нечего («обычный день»). Дни без записей не считаются «днями без привычки».</div>
         )}
         {ins.tags.map((t) => {
           const w = (Math.abs(t.recovery_diff) / maxAbs) * 50;
@@ -82,7 +83,9 @@ export default function Insights({ c }: { c: Palette }) {
           <div className="pending-tags">
             <span className="sub" style={{ fontSize: 12 }}>Собираем данные:</span>
             {ins.pending_tags.map((p) => (
-              <span key={p.tag} className="pending-tag" title={`Нужно ещё ${p.need - p.n} дн. с этим тегом`}>
+              <span key={p.tag} className="pending-tag" title={p.n < p.need
+                ? `Нужно ещё ${p.need - p.n} дн. с этим тегом`
+                : `Не с чем сравнить: нужно ${p.need} дн. с записями, но без этого тега (сейчас ${p.n_without})`}>
                 #{p.tag} <span className="muted">{p.n}/{p.need}</span>
               </span>
             ))}

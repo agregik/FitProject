@@ -34,7 +34,7 @@ export type Driver = {
 };
 export type Insights = {
   period_days: number; days_with_data: number; tags: TagEffect[]; drivers: Driver[];
-  pending_tags: { tag: string; n: number; need: number }[];
+  pending_tags: { tag: string; n: number; need: number; n_without: number }[];
   weekday: { weekday: string; recovery: number | null; n: number }[];
 };
 export type LiftSet = { weight_kg: number | null; reps: number; rir: number | null };

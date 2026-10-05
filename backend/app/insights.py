@@ -113,7 +113,12 @@ def compute(user_id: int, days_back: int = 180) -> dict:
         if nxt and nxt.get("recovery") is not None:
             pairs.append((d, nxt))
 
-    has_notes = {d["date"] for d in days if d.get("notes") or d.get("lift_groups")}
+    # A missing journal entry means "unknown", not "didn't happen". So a journal tag is compared only
+    # against days where something *was* logged (just not this tag), and a strength tag only against
+    # days since the user started logging lifts. Days with no data on that channel are left out.
+    note_days = {d["date"] for d in days if d.get("notes")}
+    lift_dates = [d["date"] for d in days if d.get("lift_groups")]
+    first_lift = min(lift_dates) if lift_dates else None
     tag_counts: dict[str, int] = {}
     for d in days:
         for t in d.get("tags", []):
@@ -122,15 +127,16 @@ def compute(user_id: int, days_back: int = 180) -> dict:
     tag_effects = []
     pending = []  # tags we've seen but can't judge yet — shown as "собираем данные"
     for tag, cnt in tag_counts.items():
+        if tag.startswith("силовая_"):
+            observed = lambda d: d["date"] >= first_lift  # noqa: E731
+        else:
+            observed = lambda d: d["date"] in note_days  # noqa: E731
         with_r = [n["recovery"] for d, n in pairs if tag in d["tags"]]
-        # Compare against days where you logged something, but not this tag,
-        # falling back to all other days if the journal is sparse.
-        without = [(d, n) for d, n in pairs if tag not in d["tags"] and d["date"] in has_notes]
-        if len(without) < MIN_N:
-            without = [(d, n) for d, n in pairs if tag not in d["tags"]]
+        without = [(d, n) for d, n in pairs if tag not in d["tags"] and observed(d)]
         without_r = [n["recovery"] for _, n in without]
         if len(with_r) < MIN_N or len(without_r) < MIN_N:
-            pending.append({"tag": tag, "n": len(with_r), "need": MIN_N})
+            pending.append({"tag": tag, "n": len(with_r), "need": MIN_N,
+                            "n_without": len(without_r)})
             continue
         with_h = [n["hrv"] for d, n in pairs if tag in d["tags"] and n.get("hrv")]
         without_h = [n["hrv"] for _, n in without if n.get("hrv")]
@@ -155,6 +161,9 @@ def compute(user_id: int, days_back: int = 180) -> dict:
     for t, q in zip(tag_effects, _bh_adjust([t["p_value"] for t in tag_effects])):
         t["q_value"] = round(q, 3)
         t["confidence"] = _confidence(t["p_value"], t["n"], q)
+        # The UI says "interval crosses zero → may be chance", so never call that "high".
+        if t["confidence"] == "высокая" and t["ci_low"] <= 0 <= t["ci_high"]:
+            t["confidence"] = "средняя"
     rank = {"высокая": 0, "средняя": 1, "низкая": 2}
     tag_effects.sort(key=lambda x: (rank[x["confidence"]], -abs(x["recovery_diff"])))
     pending.sort(key=lambda x: -x["n"])
