@@ -56,6 +56,7 @@ export type Me = {
   id: number; first_name: string | null; last_name: string | null; email: string | null; is_demo: boolean;
   last_sync_at: string | null; telegram_linked: boolean; telegram_enabled: boolean; whoop_configured: boolean;
   coach_ai: boolean; ics_urls: string[]; settings: { tz: string; wake_time: string }; api_token: string;
+  public_url: string | null;
 };
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
@@ -99,6 +100,7 @@ export const api = {
   sync: () => req<Record<string, number>>("/api/sync", { method: "POST" }),
   setCalendar: (urls: string[]) =>
     req<{ events: number }>("/api/calendar", { method: "POST", body: JSON.stringify({ urls }) }),
+  deviceLink: () => req<{ url: string; expires_in: number }>("/api/device-link", { method: "POST" }),
   telegramLink: () => req<{ url: string }>("/api/telegram/link", { method: "POST" }),
   settings: (s: { tz?: string; wake_time?: string }) =>
     req("/api/settings", { method: "PATCH", body: JSON.stringify(s) }),

@@ -166,6 +166,13 @@ CREATE TABLE IF NOT EXISTS lift_sets (
 CREATE INDEX IF NOT EXISTS lift_sets_session ON lift_sets(session_id);
 CREATE INDEX IF NOT EXISTS lift_sets_exercise ON lift_sets(exercise_id);
 
+CREATE TABLE IF NOT EXISTS device_links (
+    code_hash  TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL,
+    expires_at REAL NOT NULL,
+    used_at    REAL
+);
+
 CREATE TABLE IF NOT EXISTS notified (
     user_id INTEGER NOT NULL,
     kind    TEXT NOT NULL,

@@ -29,6 +29,21 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "")
 
 DEFAULT_TZ = os.getenv("DEFAULT_TZ", "Europe/Moscow")
+PUBLIC_URL_FILE = Path(__file__).resolve().parent.parent / ".public_url"
+
+
+def public_url() -> str | None:
+    """HTTPS address the phone can reach. PUBLIC_URL from .env wins; otherwise tunnel.sh writes
+    .public_url on every start (a quick Cloudflare tunnel gets a new address each time)."""
+    if os.getenv("PUBLIC_URL"):
+        return os.getenv("PUBLIC_URL").rstrip("/")
+    try:
+        url = PUBLIC_URL_FILE.read_text().strip()
+    except OSError:
+        return None
+    return url.rstrip("/") if url.startswith("https://") else None
+
+
 DB_PATH = os.getenv("DB_PATH", str(Path(__file__).resolve().parent.parent / "fitproject.db"))
 
 SYNC_INTERVAL_SEC = int(os.getenv("SYNC_INTERVAL_SEC", "3600"))

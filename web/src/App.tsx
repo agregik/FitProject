@@ -40,6 +40,10 @@ const fromHash = (): PageId => {
   return PAGES.some((p) => p.id === h) ? h : "today";
 };
 
+// WHOOP's OAuth redirect points at localhost, so WHOOP login only works on the laptop itself.
+const onLaptop = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+const loginError = new URLSearchParams(location.search).get("error");
+
 export default function App() {
   const { c, pref, setPref } = useTheme();
   const [page, setPage] = useState<PageId>(fromHash);
@@ -61,7 +65,17 @@ export default function App() {
         <div className="card stack" style={{ maxWidth: 420, textAlign: "center" }}>
           <div className="brand" style={{ justifyContent: "center", margin: 0 }}><span className="brand-dot" />FitProject</div>
           <div className="sub">Твой WHOOP, только понятнее: тренды, журнал, инсайты и AI-коуч.</div>
-          <a className="btn primary" href="/auth/login" style={{ textDecoration: "none" }}>Войти через WHOOP</a>
+          {loginError === "device_link_expired" && (
+            <div className="sub" style={{ color: c.critical }}>QR-код уже использован или истёк. Покажи новый.</div>
+          )}
+          {onLaptop ? (
+            <a className="btn primary" href="/auth/login" style={{ textDecoration: "none" }}>Войти через WHOOP</a>
+          ) : (
+            <div className="sub">
+              Чтобы войти с телефона, открой FitProject на компьютере → Настройки → «Подключить телефон» и наведи
+              камеру на QR-код.
+            </div>
+          )}
         </div>
       </div>
     );

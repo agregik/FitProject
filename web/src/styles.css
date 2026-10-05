@@ -268,14 +268,15 @@ code { font-family: ui-monospace, Menlo, monospace; font-size: .9em; background:
 .lift-session:last-child { border-bottom: 0; }
 .lift-line { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 2px 0; }
 .lift-line .muted { text-align: right; font-variant-numeric: tabular-nums; }
+.qr { width: 220px; height: 220px; border-radius: 14px; align-self: center; image-rendering: pixelated; }
 .loading { opacity: 0.55; transition: opacity .25s; }
 
 /* ---------- mobile ---------- */
 @media (max-width: 900px) {
   .app { grid-template-columns: 1fr; }
   .side {
-    position: fixed; bottom: 12px; top: auto; left: 12px; right: 12px; height: auto; z-index: 10;
-    flex-direction: row; justify-content: space-around; padding: 6px; padding-bottom: calc(6px + env(safe-area-inset-bottom) * .5);
+    position: fixed; bottom: max(12px, env(safe-area-inset-bottom)); top: auto; left: 12px; right: 12px; height: auto; z-index: 10;
+    flex-direction: row; justify-content: space-around; padding: 6px;
     border-radius: 20px; border: 1px solid var(--border);
     background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     box-shadow: 0 10px 30px -10px rgba(60, 40, 20, .25);
@@ -283,7 +284,7 @@ code { font-family: ui-monospace, Menlo, monospace; font-size: .9em; background:
   .side .brand, .side-foot { display: none; }
   .nav-btn { flex: 1 1 0; min-width: 0; flex-direction: column; gap: 3px; font-size: 10px; padding: 7px 2px; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 14px; }
   .nav-btn.active { box-shadow: none; background: var(--surface-2); }
-  main { padding: 22px 16px 110px; }
+  main { padding: 22px 16px calc(110px + env(safe-area-inset-bottom)); }
   h1 { font-size: 26px; }
   .card { padding: 18px; border-radius: 20px; }
   .grid { gap: 12px; }

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import QRCode from "qrcode";
+import { useEffect, useState } from "react";
 import { api, type Me } from "../api";
 import type { ThemePref } from "../theme";
 
@@ -11,7 +12,6 @@ export default function Settings({
   const [tz, setTz] = useState(me.settings.tz);
   const [syncMsg, setSyncMsg] = useState("");
   const [tgErr, setTgErr] = useState("");
-  const [showToken, setShowToken] = useState(false);
 
   const saveCalendar = async () => {
     setIcsMsg("Загружаю…");
@@ -113,13 +113,90 @@ export default function Settings({
           <a className="btn" href="/api/export.csv" style={{ textDecoration: "none", textAlign: "center" }}>Скачать CSV</a>
         </div>
 
-        <div className="card stack">
-          <h2>iOS-приложение и виджеты</h2>
-          <div className="sub">Токен для приложения на iPhone (этап 2). Никому его не показывай.</div>
+        <PhoneCard me={me} />
+      </div>
+    </>
+  );
+}
+
+const isLocal = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+
+function PhoneCard({ me }: { me: Me }) {
+  const [link, setLink] = useState<{ url: string; qr: string; until: number } | null>(null);
+  const [left, setLeft] = useState(0);
+  const [err, setErr] = useState("");
+  const [showToken, setShowToken] = useState(false);
+
+  useEffect(() => {
+    if (!link) return;
+    const t = setInterval(() => {
+      const s = Math.max(0, Math.round((link.until - Date.now()) / 1000));
+      setLeft(s);
+      if (!s) setLink(null);
+    }, 1000);
+    return () => clearInterval(t);
+  }, [link]);
+
+  const make = async () => {
+    setErr("");
+    try {
+      const r = await api.deviceLink();
+      const qr = await QRCode.toDataURL(r.url, { margin: 1, width: 440, color: { dark: "#2b2520", light: "#ffffff" } });
+      setLink({ url: r.url, qr, until: Date.now() + r.expires_in * 1000 });
+      setLeft(r.expires_in);
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
+
+  // Opened from the phone itself: pairing is done, just explain installing to the home screen.
+  if (!isLocal) {
+    return (
+      <div className="card stack">
+        <h2>Приложение на телефоне</h2>
+        <div className="sub">
+          Safari → кнопка «Поделиться» → «На экран „Домой“». Появится иконка FitProject, приложение откроется
+          на весь экран, без адресной строки.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card stack">
+      <h2>Подключить телефон</h2>
+      {!me.public_url ? (
+        <div className="sub">
+          Телефон не видит <code>localhost</code>. Запусти в отдельном терминале <code>./tunnel.sh</code>: он
+          откроет сервер по HTTPS-адресу. Потом обнови эту страницу.
+        </div>
+      ) : link ? (
+        <>
+          <img src={link.qr} alt="QR-код для входа с телефона" className="qr" />
+          <div className="sub">
+            Наведи камеру iPhone на код и открой ссылку. Затем в Safari: «Поделиться» → «На экран „Домой“».
+            Код одноразовый, действует ещё {Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}.
+          </div>
+          <button className="btn" onClick={() => setLink(null)}>Скрыть</button>
+        </>
+      ) : (
+        <>
+          <div className="sub">
+            Покажет QR-код: наведёшь камеру айфона, и ты уже вошёл, без логина WHOOP. Адрес туннеля:{" "}
+            <span className="muted">{me.public_url.replace("https://", "")}</span>
+          </div>
+          <button className="btn primary" onClick={make}>Показать QR-код</button>
+        </>
+      )}
+      {err && <div className="sub">{err}</div>}
+      <details>
+        <summary className="sub" style={{ cursor: "pointer" }}>Токен для виджетов и своих скриптов</summary>
+        <div className="stack" style={{ marginTop: 8 }}>
+          <div className="sub">Даёт полный доступ к твоим данным. Никому его не показывай.</div>
           {showToken ? <div className="code">{me.api_token}</div>
             : <button className="btn" onClick={() => setShowToken(true)}>Показать токен</button>}
         </div>
-      </div>
-    </>
+      </details>
+    </div>
   );
 }

@@ -3,7 +3,9 @@ import csv
 import io
 import json
 import logging
+import hashlib
 import secrets
+import time
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
 from pathlib import Path
@@ -101,6 +103,50 @@ async def callback(request: Request, bg: BackgroundTasks, code: str | None = Non
     return resp
 
 
+# ---------- phone pairing ----------
+# The phone can't do WHOOP OAuth (its redirect URI points at localhost, and a quick tunnel's address
+# changes on every start). Instead the logged-in laptop mints a one-time, 10-minute code shown as a QR;
+# opening it on the phone sets the session cookie there.
+
+DEVICE_LINK_TTL = 600
+
+
+def _code_hash(code: str) -> str:
+    return hashlib.sha256(code.encode()).hexdigest()
+
+
+@app.post("/api/device-link")
+def device_link(user=Depends(current_user)):
+    base = config.public_url()
+    if not base:
+        raise HTTPException(409, "Нет публичного адреса: запусти ./tunnel.sh")
+    code = secrets.token_urlsafe(24)
+    now = time.time()
+    with db.conn() as c:
+        c.execute("DELETE FROM device_links WHERE expires_at < ?", (now,))
+        c.execute("INSERT INTO device_links (code_hash, user_id, expires_at) VALUES (?,?,?)",
+                  (_code_hash(code), user["id"], now + DEVICE_LINK_TTL))
+    return {"url": f"{base}/auth/device?code={code}", "expires_in": DEVICE_LINK_TTL}
+
+
+@app.get("/auth/device")
+def device_login(request: Request, code: str = ""):
+    now = time.time()
+    with db.conn() as c:
+        # Single UPDATE claims the code atomically: a second scan of the same QR finds used_at set.
+        cur = c.execute("UPDATE device_links SET used_at=? WHERE code_hash=? AND used_at IS NULL AND expires_at >= ?",
+                        (now, _code_hash(code), now))
+        row = c.execute("SELECT user_id FROM device_links WHERE code_hash=?", (_code_hash(code),)).fetchone() \
+            if cur.rowcount == 1 else None
+    if not row:
+        return RedirectResponse("/?error=device_link_expired")
+    u = db.get_user(row["user_id"])
+    resp = RedirectResponse("/")
+    resp.set_cookie(COOKIE, u["api_token"], max_age=3600 * 24 * 365, httponly=True, samesite="lax",
+                    secure=request.url.scheme == "https")
+    return resp
+
+
 @app.post("/auth/logout")
 def logout():
     resp = JSONResponse({"ok": True})
@@ -117,6 +163,7 @@ def me(user=Depends(current_user)):
         "whoop_configured": bool(config.WHOOP_CLIENT_ID), "coach_ai": bool(config.ANTHROPIC_API_KEY),
         "ics_urls": user["ics_urls"], "settings": db.user_settings(user),
         "api_token": user["api_token"],  # for the iOS app / widget setup
+        "public_url": config.public_url(),
     }
 
 
