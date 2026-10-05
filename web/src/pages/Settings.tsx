@@ -146,8 +146,8 @@ function PhoneCard({ me }: { me: Me }) {
       setLeft(r.expires_in);
     } catch (e) {
       setErr((e as Error & { status?: number }).status === 409
-        ? "Телефон пока не видит этот компьютер: запусти в терминале ./tunnel.sh и дождись строки «✅ Телефон: …», "
-          + "потом нажми кнопку ещё раз. Если туннель не подключается — выключи VPN (V2Box)."
+        ? "Телефон пока не видит этот компьютер. Дома в одной Wi‑Fi сети: перезапусти сервер командой ./start.sh --lan. "
+          + "Из любого места: запусти ./tunnel.sh и дождись «✅ Телефон: …». Потом нажми кнопку ещё раз."
         : (e as Error).message);
     }
   };
@@ -181,7 +181,7 @@ function PhoneCard({ me }: { me: Me }) {
         <>
           <div className="sub">
             Покажет QR-код: наведёшь камеру айфона, и ты уже вошёл, без логина WHOOP.
-            {me.public_url && <> Адрес: <span className="muted">{me.public_url.replace("https://", "")}</span></>}
+            {me.public_url && <> Адрес: <span className="muted">{me.public_url.replace(/^https?:\/\//, "")}</span></>}
           </div>
           <button className="btn primary" onClick={make}>Показать QR-код</button>
         </>
